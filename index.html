@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Stream Player</title>
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap');
+
+        :root {
+            --plyr-color-main: #00A3FF;
+            --bg-color: #050507;
+            --modal-bg: rgba(15, 15, 18, 0.9);
+            --modal-border: rgba(255, 255, 255, 0.06);
+            --text-primary: #ffffff;
+            --text-secondary: #8a8a93;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(circle at 50% 0%, #111118 0%, var(--bg-color) 70%);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+        }
+
+        .video-container {
+            width: 100%;
+            max-width: 1280px;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.95);
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            background: #000;
+            position: relative;
+        }
+
+        /* --- Blended Custom Loading Overlay --- */
+        .custom-loader-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 45; 
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+            pointer-events: none;
+        }
+
+        .custom-loader-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .spinner-ring {
+            width: 42px;
+            height: 42px;
+            border: 3px solid rgba(255, 255, 255, 0.05);
+            border-top-color: var(--plyr-color-main);
+            border-radius: 50%;
+            animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            margin-bottom: 16px;
+            box-shadow: 0 0 20px rgba(0, 163, 255, 0.2);
+        }
+
+        .loading-text {
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 13px;
+            font-weight: 500;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        /* Hide default plyr loader perfectly */
+        .plyr--loading .plyr__video-wrapper::before,
+        .plyr__video-wrapper::before {
+            display: none !important;
+            opacity: 0 !important;
+        }
+
+        /* --- Floating Telegram Button (Inside Player) --- */
+        .floating-tg {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            z-index: 50;
+            background: rgba(15, 15, 18, 0.6);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 40px;
+            padding: 6px 12px 6px 6px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+            animation: float 4s ease-in-out infinite;
+            transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+        }
+
+        .floating-tg.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .floating-tg:hover {
+            background: rgba(25, 25, 30, 0.9);
+            transform: scale(1.03);
+            border-color: rgba(0, 163, 255, 0.5);
+        }
+
+        .tg-icon-small {
+            width: 26px;
+            height: 26px;
+            background: linear-gradient(135deg, #2AABEE 0%, #229ED9 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(34, 158, 217, 0.5);
+        }
+
+        .tg-icon-small svg {
+            width: 13px;
+            height: 13px;
+            fill: #fff;
+            margin-right: 1px;
+            margin-top: 1px;
+        }
+
+        .tg-text-small {
+            letter-spacing: 0.3px;
+        }
+
+        .btn-close-tg {
+            background: transparent;
+            border: none;
+            color: rgba(255,255,255,0.4);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 16px;
+            margin-left: 2px;
+            transition: 0.2s;
+            padding: 0;
+        }
+
+        .btn-close-tg:hover {
+            color: #fff;
+        }
+
+        /* --- Main Popup (30% Smaller) --- */
+        .popup-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+
+        .popup-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .popup-content {
+            background: var(--modal-bg);
+            padding: 32px 24px 24px 24px;
+            border-radius: 20px;
+            text-align: center;
+            width: 90%;
+            max-width: 270px; 
+            border: 1px solid var(--modal-border);
+            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            transform: translateY(30px) scale(0.95);
+            opacity: 0;
+            transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+            transition-delay: 0.1s;
+        }
+
+        .popup-overlay.show .popup-content {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+        }
+
+        .tg-icon-wrapper {
+            width: 50px;
+            height: 50px;
+            margin: 0 auto 18px auto;
+            background: linear-gradient(135deg, #2AABEE 0%, #229ED9 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 25px rgba(34, 158, 217, 0.4), inset 0 2px 4px rgba(255, 255, 255, 0.3);
+            animation: float 4s ease-in-out infinite;
+        }
+
+        .tg-icon-wrapper svg {
+            width: 24px;
+            height: 24px;
+            fill: #fff;
+            margin-right: 2px;
+            margin-top: 1px;
+        }
+
+        .popup-content h2 {
+            margin: 0 0 10px 0;
+            font-size: 21px; 
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: -0.3px;
+        }
+
+        .popup-content p {
+            color: var(--text-secondary);
+            font-size: 13px; 
+            line-height: 1.5;
+            margin: 0 0 24px 0;
+            font-weight: 400;
+        }
+
+        .btn-join {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #00A3FF 0%, #0066FF 100%);
+            color: #fff;
+            text-decoration: none;
+            padding: 14px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 12px;
+            margin-bottom: 14px;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px rgba(0, 163, 255, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-join::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%; width: 50%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transform: skewX(-20deg);
+            transition: all 0.6s ease;
+        }
+
+        .btn-join:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px rgba(0, 163, 255, 0.4);
+        }
+
+        .btn-join:hover::after {
+            left: 150%;
+        }
+
+        .btn-dismiss {
+            display: inline-block;
+            color: rgba(255,255,255,0.4);
+            font-size: 12px; 
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 6px 12px;
+            border-radius: 15px;
+        }
+
+        .btn-dismiss:hover {
+            color: #fff;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+            100% { transform: translateY(0px); }
+        }
+
+        /* Plyr premium UI overrides */
+        .plyr--video .plyr__control.plyr__tab-focus,
+        .plyr--video .plyr__control:hover,
+        .plyr--video .plyr__control[aria-expanded=true] {
+            background: var(--plyr-color-main);
+        }
+        .plyr__menu__container {
+            background: rgba(15, 15, 18, 0.95);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.8);
+        }
+        .plyr__control {
+            border-radius: 8px !important;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Main Entry Popup -->
+    <div id="main-popup" class="popup-overlay">
+        <div class="popup-content">
+            <div class="tg-icon-wrapper">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.892-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+                </svg>
+            </div>
+            <h2>Premium Access</h2>
+            <p>Join for free streaming links & daily updates.</p>
+            <a href="https://t.me/+9VD--MYgyMo5Yzg1" target="_blank" class="btn-join">Join Now</a>
+            <span class="btn-dismiss" onclick="dismissMainPopup()">I've joined</span>
+        </div>
+    </div>
+
+    <div class="video-container">
+        
+        <!-- Seamless Custom Loading Overlay -->
+        <div id="stream-loader" class="custom-loader-overlay">
+            <div class="spinner-ring"></div>
+            <div class="loading-text">Stream Loading...</div>
+        </div>
+
+        <!-- Floating Telegram Button inside player -->
+        <div id="floating-tg" class="floating-tg">
+            <a href="https://t.me/+9VD--MYgyMo5Yzg1" target="_blank" style="display:flex; align-items:center; gap:8px; text-decoration:none;">
+                <div class="tg-icon-small">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.892-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+                    </svg>
+                </div>
+                <span class="tg-text-small">Join Now</span>
+            </a>
+            <button class="btn-close-tg" onclick="dismissTg()">×</button>
+        </div>
+
+        <video id="player" controls crossorigin playsinline></video>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+    <script>
+        const video = document.querySelector('#player');
+        const customLoader = document.getElementById('stream-loader');
+        const source = 'https://aegis-cloudfront-1.tubi.video/bfad29e2-5bee-44f3-8256-127324e8b106/playlist.m3u8';
+        
+        const defaultOptions = {
+            controls: [
+                'play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 
+                'volume', 'captions', 'settings', 'pip', 'airplay', 'fullscreen'
+            ],
+            settings: ['quality', 'speed'],
+            keyboard: { focused: true, global: true },
+            tooltips: { controls: true, seek: true },
+            displayDuration: true,
+            autoplay: true 
+        };
+
+        // Loading Indicator Logic
+        function showLoader() { customLoader.classList.remove('hidden'); }
+        function hideLoader() { customLoader.classList.add('hidden'); }
+
+        video.addEventListener('loadstart', showLoader);
+        video.addEventListener('waiting', showLoader);
+        video.addEventListener('canplay', hideLoader);
+        video.addEventListener('playing', hideLoader);
+
+        if (Hls.isSupported()) {
+            const hls = new Hls({
+                maxBufferLength: 10, 
+                maxMaxBufferLength: 20,
+                enableWorker: true,
+                lowLatencyMode: true,
+                capLevelToPlayerSize: true, 
+                startLevel: -1,
+                startFragPrefetch: true, 
+                liveSyncDurationCount: 2,
+                liveMaxLatencyDurationCount: 4,
+                fragLoadingTimeOut: 15000,
+                manifestLoadingTimeOut: 10000
+            });
+
+            hls.loadSource(source);
+            
+            hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
+                const availableQualities = hls.levels.map(l => l.height).sort((a, b) => b - a);
+                availableQualities.unshift(0); 
+
+                defaultOptions.quality = {
+                    default: 0, 
+                    options: availableQualities,
+                    forced: true,
+                    onChange: (e) => updateQuality(e)
+                };
+
+                defaultOptions.i18n = { qualityLabel: { 0: 'Auto' } };
+                
+                const player = new Plyr(video, defaultOptions);
+                
+                player.on('ready', () => {
+                    const plyrContainer = document.querySelector('.plyr');
+                    // Embed overlays inside plyr container to maintain context in fullscreen
+                    plyrContainer.appendChild(customLoader);
+                    plyrContainer.appendChild(document.getElementById('floating-tg'));
+                });
+            });
+
+            hls.on(Hls.Events.ERROR, function(event, data) {
+                if (data.fatal) hideLoader();
+            });
+
+            hls.attachMedia(video);
+            window.hls = hls;
+
+            function updateQuality(newQuality) {
+                if (newQuality === 0) {
+                    window.hls.currentLevel = -1;
+                } else {
+                    window.hls.levels.forEach((level, levelIndex) => {
+                        if (level.height === newQuality) {
+                            window.hls.currentLevel = levelIndex;
+                        }
+                    });
+                }
+            }
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = source;
+            new Plyr(video, defaultOptions);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                document.getElementById('main-popup').classList.add('show');
+            }, 300);
+        });
+
+        setTimeout(() => {
+            document.getElementById('floating-tg').classList.add('show');
+        }, 2500);
+
+        function dismissMainPopup() {
+            const popup = document.getElementById('main-popup');
+            popup.style.opacity = '0';
+            popup.style.visibility = 'hidden';
+            setTimeout(() => { popup.remove(); }, 500);
+        }
+
+        function dismissTg() {
+            const el = document.getElementById('floating-tg');
+            el.style.opacity = '0';
+            el.style.visibility = 'hidden';
+            setTimeout(() => { el.remove(); }, 300);
+        }
+    </script>
+</body>
+</html>
