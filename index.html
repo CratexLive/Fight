@@ -3,24 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Premium Stream Player</title>
+    <title>Live Stream Player</title>
     
-    <!-- 1. Load Configuration -->
+    <!-- 1. Global Player Configuration -->
     <script src="config.js"></script>
     
-    <!-- 2. Load Player Libraries -->
+    <!-- 2. Streaming & UI Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
     
-    <!-- 3. Load Custom Web Component -->
-    <script src="stream-ui.js" defer></script>
+    <!-- 3. CricXCrate Web Component -->
+    <script src="cricxcrate-ui.js" defer></script>
     
     <style>
-        body { margin: 0; background-color: #050507; height: 100vh; overflow: hidden; }
+        * { box-sizing: border-box; }
+        body { 
+            margin: 0; 
+            padding: 0; 
+            background-color: #050507; 
+            height: 100vh; 
+            overflow: hidden; 
+        }
     </style>
 </head>
 <body>
-    <!-- The component handles everything securely -->
-    <secure-stream-ui></secure-stream-ui>
+    <!-- Renders the encapsulated shadow player -->
+    <cricxcrate-ui></cricxcrate-ui>
 </body>
 </html>
